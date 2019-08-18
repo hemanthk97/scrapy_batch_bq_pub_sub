@@ -16,7 +16,7 @@ import string
 
 class BlogSpider(scrapy.Spider):
     name = 'blogspider'
-    start_urls = ['https://www.ulta.com/hair-treatment?N=26xy']
+    start_urls = ['https://www.ulta.com/miracle-hair-mask?productId=xlsImpprod6481226']
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscriber.subscription_path('linux-249818', 'prod_sub')
     a = True
@@ -26,7 +26,6 @@ class BlogSpider(scrapy.Spider):
     def start_requests(self):
         NUM_MESSAGES = 1
         while self.a:
-            count = 0
             response = self.subscriber.pull(self.subscription_path, max_messages=NUM_MESSAGES)
             print(len(response.received_messages),"Len on message")
             if len(response.received_messages) >= 1:
@@ -46,12 +45,37 @@ class BlogSpider(scrapy.Spider):
 
     def parse(self, response):
         item =dict()
-        item['name'] = response.css('.ProductMainSection__productName > span::text').get()
-        item['price'] = response.css('.ProductPricingPanel > span::text').get()
-        self.ingest(item)
+        data = json.loads(response.css('script[type="application/ld+json"]::text').get())
+        item['name'] = data['name']
+        item['price'] = data['offers']['price']
+        item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
+        item['sku'] = data['productID']
+        item['desc'] = data['description']
+        item['image'] = [data['image']]
+        item['url'] = response.url
+        item['rating'] = data['aggregateRating']['ratingValue']
+        item['review'] = data['aggregateRating']['reviewCount']
+        print(item)
+        # item['name'] = response.css('.ProductMainSection__productName > span::text').get()
+        # item['price'] = response.css('meta[property="product:price:amount"]::attr(content)').get()
+        # item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
+        # item['sku'] = response.css('.ProductMainSection__itemNumber *::text').get()
+        # item['desc'] = response.css('meta[property="og:description"]::attr(content)').get()
+        # item['image'] = [response.css('meta[property="og:image"]::attr(content)').get()]
+
+        # print(item)
+        self.stream_pub(item)
+
+    def stream_pub(self,data):
+        publisher = pubsub_v1.PublisherClient()
+        topic_path = publisher.topic_path('linux-249818', 'casper_pub')
+        mess = json.dumps(data).encode('utf8')
+        future = publisher.publish(
+            topic_path, mess, origin='python-sample', username='gcp'
+        )
+        print(future.result())
 
     def ingest(self, data):
-
         self.data.append(data)
         if len(self.data) == 100:
             self.push_bq(self.data)
