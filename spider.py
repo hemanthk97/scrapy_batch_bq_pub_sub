@@ -6,6 +6,7 @@ from google.cloud import bigquery
 import csv
 import random
 import string
+from google.cloud import datastore
 
 # def test():
 #     data = [{'name':'Hello','price':'12'},{'name':'Hello','price':'12'}]
@@ -23,14 +24,44 @@ class BlogSpider(scrapy.Spider):
     count = 0
     data = []
 
+    datastore_client = datastore.Client('linux-249818')
+    task_key = datastore_client.key('Cas', 'Casper')
+    task = datastore.Entity(key=task_key)
+
+    ack = []
+
+    def counter(self):
+        res = self.datastore_client.get(self.task_key)
+        print(res['count_spider'])
+        self.task['count_crawl'] = res['count_crawl']
+        self.task['count_spider'] = res['count_spider'] + 1
+        self.task['failed'] = res['failed']
+        self.datastore_client.put(self.task)
+
+    def counter_failed(self):
+        res = self.datastore_client.get(self.task_key)
+        print(res['count_spider'])
+        self.task['count_crawl'] = res['count_crawl']
+        self.task['count_spider'] = res['count_spider']
+        self.task['failed'] = res['failed'] + 1
+        self.datastore_client.put(self.task)
+
     def start_requests(self):
-        NUM_MESSAGES = 1
+        NUM_MESSAGES = 10
         while self.a:
+            self.ack = []
             response = self.subscriber.pull(self.subscription_path, max_messages=NUM_MESSAGES)
             print(len(response.received_messages),"Len on message")
             if len(response.received_messages) >= 1:
-                self.subscriber.acknowledge(self.subscription_path, [response.received_messages[0].ack_id])
-                yield scrapy.FormRequest(response.received_messages[0].message.data.decode('utf-8'),
+                if len(response.received_messages) > 1:
+                    print("Recevied more than one messages!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                    for res in response.received_messages:
+                        self.subscriber.acknowledge(self.subscription_path, [res.ack_id])
+                        yield scrapy.FormRequest(res.message.data.decode('utf-8'),
+                                           callback=self.parse)
+                else:
+                    self.subscriber.acknowledge(self.subscription_path, [response.received_messages[0].ack_id])
+                    yield scrapy.FormRequest(response.received_messages[0].message.data.decode('utf-8'),
                                        callback=self.parse)
             else:
                 print("No message")
@@ -44,18 +75,23 @@ class BlogSpider(scrapy.Spider):
 
 
     def parse(self, response):
-        item =dict()
-        data = json.loads(response.css('script[type="application/ld+json"]::text').get())
-        item['name'] = data['name']
-        item['price'] = data['offers']['price']
-        item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
-        item['sku'] = data['productID']
-        item['desc'] = data['description']
-        item['image'] = [data['image']]
-        item['url'] = response.url
-        item['rating'] = data['aggregateRating']['ratingValue']
-        item['review'] = data['aggregateRating']['reviewCount']
-        print(item)
+        try:
+            item =dict()
+            data = json.loads(response.css('script[type="application/ld+json"]::text').get())
+            item['name'] = data['name']
+            item['price'] = data['offers']['price']
+            item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
+            item['sku'] = data['productID']
+            item['desc'] = data['description']
+            item['image'] = [data['image']]
+            item['url'] = response.url
+            item['rating'] = data['aggregateRating']['ratingValue']
+            item['review'] = data['aggregateRating']['reviewCount']
+            self.stream_pub(item)
+        except:
+            self.counter_failed()
+
+
         # item['name'] = response.css('.ProductMainSection__productName > span::text').get()
         # item['price'] = response.css('meta[property="product:price:amount"]::attr(content)').get()
         # item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
@@ -64,7 +100,7 @@ class BlogSpider(scrapy.Spider):
         # item['image'] = [response.css('meta[property="og:image"]::attr(content)').get()]
 
         # print(item)
-        self.stream_pub(item)
+
 
     def stream_pub(self,data):
         publisher = pubsub_v1.PublisherClient()
@@ -73,7 +109,9 @@ class BlogSpider(scrapy.Spider):
         future = publisher.publish(
             topic_path, mess, origin='python-sample', username='gcp'
         )
+        self.counter()
         print(future.result())
+
 
     def ingest(self, data):
         self.data.append(data)
