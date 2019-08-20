@@ -8,6 +8,12 @@ class BlogSpider(scrapy.Spider):
     datastore_client = datastore.Client('linux-249818')
     task_key = datastore_client.key('Cas', 'Casper')
     task = datastore.Entity(key=task_key)
+    batch_settings = pubsub_v1.types.BatchSettings(
+    max_bytes=1024,  # One kilobyte
+    max_latency=1,   # One second
+)
+    publisher = pubsub_v1.PublisherClient(batch_settings)
+    topic_path = publisher.topic_path('linux-249818', 'prod_pub')
 
 
 
@@ -19,24 +25,16 @@ class BlogSpider(scrapy.Spider):
         self.task['failed'] = res['failed']
         self.datastore_client.put(self.task)
 
+
     def parse(self, response):
-        temp = ["https://www.ulta.com"+i  for i in response.css('.prod-desc > a::attr(href)').getall()]
+        temp = ["https://www.ulta.com"+i  for i in response.css('.prod-desc > a::attr(href)').getall() if i]
         print(len(temp))
-        publisher = pubsub_v1.PublisherClient()
-        topic_path = publisher.topic_path('linux-249818', 'prod_pub')
-
-
         for n in temp:
             data = n
             # Data must be a bytestring
             data = data.encode('utf-8')
             # Add two attributes, origin and username, to the message
-
-            future = publisher.publish(
-                topic_path, data, origin='python-sample', username='gcp'
-            )
             self.count()
-            print(future.result())
-
-        print('Published messages with custom attributes.')
-        print(self.count,"Total URLS")
+            self.publisher.publish(
+                self.topic_path, data, origin='python-sample', username='gcp'
+            ).result()

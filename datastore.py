@@ -4,6 +4,7 @@ from google.cloud import datastore
 datastore_client = datastore.Client('linux-249818')
 
 
+
 task_key = datastore_client.key('Cas', 'Casper')
 task = datastore.Entity(key=task_key)
 res = datastore_client.get(task_key)

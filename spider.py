@@ -5,22 +5,22 @@ import os
 from google.cloud import bigquery
 import csv
 import random
+import time
 import string
 from google.cloud import datastore
 
-# def test():
-#     data = [{'name':'Hello','price':'12'},{'name':'Hello','price':'12'}]
-#     result = [json.dumps(record) for record in data]
-#
-# test()
-    # os.remove("dict.json")
 
 class BlogSpider(scrapy.Spider):
     name = 'blogspider'
     start_urls = ['https://www.ulta.com/miracle-hair-mask?productId=xlsImpprod6481226']
+    custom_settings = {
+        'CONCURRENT_REQUESTS': 1
+    }
+
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscriber.subscription_path('linux-249818', 'prod_sub')
     a = True
+    b = True
     count = 0
     data = []
 
@@ -29,6 +29,9 @@ class BlogSpider(scrapy.Spider):
     task = datastore.Entity(key=task_key)
 
     ack = []
+    def __init__(self):
+        super(BlogSpider, self).__init__()
+        self.url = None
 
     def counter(self):
         res = self.datastore_client.get(self.task_key)
@@ -46,30 +49,39 @@ class BlogSpider(scrapy.Spider):
         self.task['failed'] = res['failed'] + 1
         self.datastore_client.put(self.task)
 
+
     def start_requests(self):
-        NUM_MESSAGES = 10
-        while self.a:
-            self.ack = []
-            response = self.subscriber.pull(self.subscription_path, max_messages=NUM_MESSAGES)
-            print(len(response.received_messages),"Len on message")
-            if len(response.received_messages) >= 1:
-                if len(response.received_messages) > 1:
-                    print("Recevied more than one messages!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    for res in response.received_messages:
-                        self.subscriber.acknowledge(self.subscription_path, [res.ack_id])
-                        yield scrapy.FormRequest(res.message.data.decode('utf-8'),
-                                           callback=self.parse)
+        while self.b:
+            res_url = self.get_messages()
+            if res_url:
+                print(res_url,"Response URLS!!!!!!!!!!")
+                yield scrapy.Request(res_url,callback=self.parse, dont_filter=True)
+            if self.a == False:
+                self.b = False
+
+        # yield self.subscriber.subscribe(self.subscription_path, self.callback).result()
+
+
+    def get_messages(self):
+        NUM_MESSAGES = 1
+        response = self.subscriber.pull(self.subscription_path, max_messages=NUM_MESSAGES)
+        print(len(response.received_messages),"Len on message")
+        if len(response.received_messages) >= 1:
+            print("Recevied messages!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            for res in response.received_messages:
+                self.subscriber.acknowledge(self.subscription_path, [res.ack_id])
+                if res.message.data.decode('utf-8'):
+                    return res.message.data.decode('utf-8')
                 else:
-                    self.subscriber.acknowledge(self.subscription_path, [response.received_messages[0].ack_id])
-                    yield scrapy.FormRequest(response.received_messages[0].message.data.decode('utf-8'),
-                                       callback=self.parse)
+                    return None
+        else:
+            print("No message")
+            self.count = self.count + 1
+            if self.count == 2:
+                self.a = False
+                return None
             else:
-                print("No message")
-                self.count = self.count + 1
-                if self.count == 2:
-                    self.a = False
-                    if len(self.data) > 0:
-                        self.push_bq(self.data)
+                return None
 
 
 
@@ -108,9 +120,9 @@ class BlogSpider(scrapy.Spider):
         mess = json.dumps(data).encode('utf8')
         future = publisher.publish(
             topic_path, mess, origin='python-sample', username='gcp'
-        )
+        ).result()
         self.counter()
-        print(future.result())
+
 
 
     def ingest(self, data):
