@@ -10,6 +10,7 @@ import string
 from google.cloud import datastore
 
 
+
 class BlogSpider(scrapy.Spider):
     name = 'blogspider'
     start_urls = ['https://www.ulta.com/miracle-hair-mask?productId=xlsImpprod6481226']
@@ -23,10 +24,30 @@ class BlogSpider(scrapy.Spider):
     b = True
     count = 0
     data = []
+    pub_sub_ack = ""
+    dataset_id = 'test'
+    table_id = 'my_data'
+    dup_urls = []
 
     datastore_client = datastore.Client('linux-249818')
     task_key = datastore_client.key('Cas', 'Casper')
     task = datastore.Entity(key=task_key)
+
+
+    client = bigquery.Client()
+    dataset_ref = client.dataset(dataset_id)
+    table_ref = dataset_ref.table(table_id)
+    table = client.get_table(table_ref)
+
+
+    def insert_bq(self,data):
+        row = tuple([str(data[field.name]) for field in self.table.schema ])
+        errors = self.client.insert_rows(self.table,[row])
+        assert errors == []
+        self.counter()
+        self.subscriber.acknowledge(self.subscription_path, [self.pub_sub_ack])
+
+
 
     ack = []
     def __init__(self):
@@ -35,7 +56,6 @@ class BlogSpider(scrapy.Spider):
 
     def counter(self):
         res = self.datastore_client.get(self.task_key)
-        print(res['count_spider'])
         self.task['count_crawl'] = res['count_crawl']
         self.task['count_spider'] = res['count_spider'] + 1
         self.task['failed'] = res['failed']
@@ -43,19 +63,18 @@ class BlogSpider(scrapy.Spider):
 
     def counter_failed(self):
         res = self.datastore_client.get(self.task_key)
-        print(res['count_spider'])
         self.task['count_crawl'] = res['count_crawl']
         self.task['count_spider'] = res['count_spider']
         self.task['failed'] = res['failed'] + 1
         self.datastore_client.put(self.task)
+        self.subscriber.acknowledge(self.subscription_path, [self.pub_sub_ack])
 
 
     def start_requests(self):
         while self.b:
             res_url = self.get_messages()
             if res_url:
-                print(res_url,"Response URLS!!!!!!!!!!")
-                yield scrapy.Request(res_url,callback=self.parse, dont_filter=True)
+                yield scrapy.Request(res_url,callback=self.parse,dont_filter=False)
             if self.a == False:
                 self.b = False
 
@@ -65,17 +84,21 @@ class BlogSpider(scrapy.Spider):
     def get_messages(self):
         NUM_MESSAGES = 1
         response = self.subscriber.pull(self.subscription_path, max_messages=NUM_MESSAGES)
-        print(len(response.received_messages),"Len on message")
         if len(response.received_messages) >= 1:
-            print("Recevied messages!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             for res in response.received_messages:
-                self.subscriber.acknowledge(self.subscription_path, [res.ack_id])
+                self.pub_sub_ack = res.ack_id
                 if res.message.data.decode('utf-8'):
-                    return res.message.data.decode('utf-8')
+                    if res.message.data.decode('utf-8') in self.dup_urls:
+                        self.subscriber.acknowledge(self.subscription_path, [res.ack_id])
+                        return None
+                    else:
+                        self.dup_urls.append(res.message.data.decode('utf-8'))
+                        return res.message.data.decode('utf-8')
                 else:
                     return None
         else:
             print("No message")
+            print(len(self.dup_urls))
             self.count = self.count + 1
             if self.count == 2:
                 self.a = False
@@ -94,12 +117,12 @@ class BlogSpider(scrapy.Spider):
             item['price'] = data['offers']['price']
             item['size'] = response.css('.ProductMainSection__colorPanel *::text').get()
             item['sku'] = data['productID']
-            item['desc'] = data['description']
             item['image'] = [data['image']]
+            item['desc'] = data['description']
             item['url'] = response.url
             item['rating'] = data['aggregateRating']['ratingValue']
             item['review'] = data['aggregateRating']['reviewCount']
-            self.stream_pub(item)
+            self.insert_bq(item)
         except:
             self.counter_failed()
 
