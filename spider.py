@@ -120,10 +120,11 @@ class BlogSpider(scrapy.Spider):
             item['image'] = [data['image']]
             item['desc'] = data['description']
             item['url'] = response.url
-            item['rating'] = data['aggregateRating']['ratingValue']
-            item['review'] = data['aggregateRating']['reviewCount']
+            item['rating'] = data['aggregateRating']['ratingValue'] if 'aggregateRating' in data else ""
+            item['review'] = data['aggregateRating']['reviewCount'] if 'aggregateRating' in data else ""
             self.insert_bq(item)
-        except:
+        except Exception as e:
+            print(str(e))
             self.counter_failed()
 
 

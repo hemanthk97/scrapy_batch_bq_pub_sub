@@ -21,6 +21,7 @@ spec:
           mountPath: /var/secrets/google
         - name: my-volume
           mountPath: /home/git/
+          readOnly: true
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/secrets/google/key.json

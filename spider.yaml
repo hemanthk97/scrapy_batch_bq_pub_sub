@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: spider
 spec:
-  parallelism: 10
+  parallelism: 6
   template:
     spec:
       volumes:
@@ -16,14 +16,16 @@ spec:
       containers:
       - name: spider
         image:  hemanthk0208/spider:v1
+        imagePullPolicy: Always
         volumeMounts:
         - name: google-cloud-key
           mountPath: /var/secrets/google
         - name: my-volume
           mountPath: /home/git/
+          readOnly: true
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/secrets/google/key.json
         command: ["scrapy", "runspider", "/home/git/app/spider.py"]
-      restartPolicy: Never
-  backoffLimit: 4
+      restartPolicy: OnFailure
+  backoffLimit: 3

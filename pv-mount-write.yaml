@@ -15,7 +15,7 @@ spec:
           claimName: my-vol
       containers:
       - name: crawl
-        image: hemanthk0208/crawl:v5
+        image: hemanthk0208/crawl:v6
         imagePullPolicy: Always
         volumeMounts:
         - name: google-cloud-key
@@ -29,7 +29,7 @@ spec:
         args:
           - echo starting;
             cp -vr /app/ /home/git;
-            sleep 1h;
+            sleep 3m;
             echo done;
       restartPolicy: Never
   backoffLimit: 4

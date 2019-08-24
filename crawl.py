@@ -10,8 +10,7 @@ class BlogSpider(scrapy.Spider):
     task_key = datastore_client.key('Cas', 'Casper')
     task = datastore.Entity(key=task_key)
     batch_settings = pubsub_v1.types.BatchSettings(
-    max_bytes=1024,  # One kilobyte
-    max_latency=0.5,   # One second
+    max_latency=5,   # One second
 )
     publisher = pubsub_v1.PublisherClient(batch_settings)
     topic_path = publisher.topic_path('linux-249818', 'prod_pub')
@@ -28,7 +27,7 @@ class BlogSpider(scrapy.Spider):
     def count(self,num):
         res = self.datastore_client.get(self.task_key)
         print(res['count_crawl'])
-        self.task['count_crawl'] = res['count_crawl'] + num
+        self.task['count_crawl'] = num
         self.task['count_spider'] = res['count_spider']
         self.task['failed'] = res['failed']
         self.datastore_client.put(self.task)
@@ -48,11 +47,12 @@ class BlogSpider(scrapy.Spider):
             # Data must be a bytestring
             data = data.encode('utf-8')
             # Add two attributes, origin and username, to the message
-            self.count(1)
             self.urlss.append(data)
-            self.publisher.publish(
+            future = self.publisher.publish(
                 self.topic_path, data, origin='python-sample', username='gcp'
-            ).result()
-        print(self.leng, "published urls")
+            )
+        published = future.result()
+        print(published, "Messages !!!")
         dup_len = [self.urlss[i] for i in range(len(self.urlss)) if i == self.urlss.index(self.urlss[i])]
+        self.count(len(dup_len))
         print("Duplicates urls", len(dup_len))
