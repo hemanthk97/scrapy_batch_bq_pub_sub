@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: crawl
+spec:
+  completions: 1
+  template:
+    spec:
+      volumes:
+      - name: google-cloud-key
+        secret:
+          secretName: pubsub-key
+      - name: my-volume
+        persistentVolumeClaim:
+          claimName: my-vol
+      containers:
+      - name: crawl
+        image:  hemanthk0208/spider:v1
+        volumeMounts:
+        - name: google-cloud-key
+          mountPath: /var/secrets/google
+        - name: my-volume
+          mountPath: /home/git/
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        command: ["scrapy", "runspider", "/home/git/app/crawl.py"]
+      restartPolicy: Never
+  backoffLimit: 4

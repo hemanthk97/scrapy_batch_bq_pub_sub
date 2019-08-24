@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test
+spec:
+  parallelism: 1
+  template:
+    spec:
+      volumes:
+      - name: google-cloud-key
+        secret:
+          secretName: pubsub-key
+      - name: my-volume
+        persistentVolumeClaim:
+          claimName: my-vol
+      containers:
+      - name: crawl
+        image: hemanthk0208/crawl:v5
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: google-cloud-key
+          mountPath: /var/secrets/google
+        - name: my-volume
+          mountPath: /home/git/
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        command: ["/bin/sh", "-c"]
+        args:
+          - echo starting;
+            cp -vr /app/ /home/git;
+            sleep 1h;
+            echo done;
+      restartPolicy: Never
+  backoffLimit: 4

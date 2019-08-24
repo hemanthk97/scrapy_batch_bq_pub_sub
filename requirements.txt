@@ -1,0 +1,4 @@
+Scrapy==1.7.3
+google-cloud-pubsub==0.45.0
+google-cloud-bigquery==1.18.0
+google-cloud-datastore==1.9.0
