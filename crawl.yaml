@@ -16,6 +16,13 @@ spec:
       containers:
       - name: crawl
         image:  hemanthk0208/spider:v1
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "0.05"
+          limits:
+            memory: "120Mi"
+            cpu: "0.09"
         volumeMounts:
         - name: google-cloud-key
           mountPath: /var/secrets/google
@@ -26,5 +33,5 @@ spec:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/secrets/google/key.json
         command: ["scrapy", "runspider", "/home/git/app/crawl.py"]
-      restartPolicy: Never
+      restartPolicy: OnFailure
   backoffLimit: 4

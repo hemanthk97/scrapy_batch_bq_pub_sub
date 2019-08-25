@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: spider
 spec:
-  parallelism: 6
+  parallelism: 4
   template:
     spec:
       volumes:
@@ -17,6 +17,13 @@ spec:
       - name: spider
         image:  hemanthk0208/spider:v1
         imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "150Mi"
+            cpu: "0.1"
+          limits:
+            memory: "180Mi"
+            cpu: "0.12"
         volumeMounts:
         - name: google-cloud-key
           mountPath: /var/secrets/google

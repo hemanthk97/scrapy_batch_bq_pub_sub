@@ -41,10 +41,10 @@ class BlogSpider(scrapy.Spider):
 
 
     def insert_bq(self,data):
+        self.counter()
         row = tuple([str(data[field.name]) for field in self.table.schema ])
         errors = self.client.insert_rows(self.table,[row])
         assert errors == []
-        self.counter()
         self.subscriber.acknowledge(self.subscription_path, [self.pub_sub_ack])
 
 
