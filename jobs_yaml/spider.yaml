@@ -1,28 +1,28 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: crawl
+  name: spider
 spec:
-  completions: 1
+  parallelism: 8
   template:
     spec:
       volumes:
       - name: google-cloud-key
         secret:
-          secretName: pubsub-key
+          secretName: casper-worker-key
       - name: my-volume
         persistentVolumeClaim:
           claimName: my-vol
       containers:
-      - name: crawl
+      - name: spider
         image:  hemanthk0208/spider:v1
         resources:
           requests:
-            memory: "100Mi"
-            cpu: "0.05"
+            memory: "150Mi"
+            cpu: "0.1"
           limits:
-            memory: "120Mi"
-            cpu: "0.09"
+            memory: "180Mi"
+            cpu: "0.12"
         volumeMounts:
         - name: google-cloud-key
           mountPath: /var/secrets/google
@@ -32,6 +32,6 @@ spec:
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/secrets/google/key.json
-        command: ["scrapy", "runspider", "/home/git/app/crawl.py"]
+        command: ["scrapy", "runspider", "/home/git/app/code/spider.py"]
       restartPolicy: OnFailure
-  backoffLimit: 4
+  backoffLimit: 3

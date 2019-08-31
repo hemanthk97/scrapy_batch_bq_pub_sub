@@ -9,13 +9,13 @@ spec:
       volumes:
       - name: google-cloud-key
         secret:
-          secretName: pubsub-key
+          secretName: casper-worker-key
       - name: my-volume
         persistentVolumeClaim:
           claimName: my-vol
       containers:
       - name: crawl
-        image: hemanthk0208/crawl:v6
+        image: hemanthk0208/crawl:v9
         imagePullPolicy: Always
         volumeMounts:
         - name: google-cloud-key
@@ -28,6 +28,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - echo starting;
+            rm -rf /home/git/;
             cp -vr /app/ /home/git;
             sleep 2m;
             echo done;

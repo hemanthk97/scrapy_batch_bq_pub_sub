@@ -28,6 +28,7 @@ class BlogSpider(scrapy.Spider):
     dataset_id = 'test'
     table_id = 'my_data'
     dup_urls = []
+    first_row = True
 
     datastore_client = datastore.Client('linux-249818')
     task_key = datastore_client.key('Cas', 'Casper')
@@ -43,7 +44,13 @@ class BlogSpider(scrapy.Spider):
     def insert_bq(self,data):
         self.counter()
         row = tuple([str(data[field.name]) for field in self.table.schema ])
-        errors = self.client.insert_rows(self.table,[row])
+        if self.first_row:
+            row_id = str(str(data['sku'])+'|'+str(data['size'])+'|'+str(data['price']))
+            errors = self.client.insert_rows(self.table,[row],row_ids=[row_id])
+            assert errors == []
+            self.first_row = False
+        row_id = str(str(data['sku'])+'|'+str(data['size'])+'|'+str(data['price']))
+        errors = self.client.insert_rows(self.table,[row],row_ids=[row_id])
         assert errors == []
         self.subscriber.acknowledge(self.subscription_path, [self.pub_sub_ack])
 
