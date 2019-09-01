@@ -8,6 +8,7 @@ import random
 import time
 import string
 from google.cloud import datastore
+import requests
 
 
 
@@ -42,7 +43,9 @@ class BlogSpider(scrapy.Spider):
 
 
     def insert_bq(self,data):
-        self.counter()
+        # self.counter()
+        r = requests.get('https://us-central1-linux-249818.cloudfunctions.net/function-1?val=spider1')
+        print(r.text)
         row = tuple([str(data[field.name]) for field in self.table.schema ])
         if self.first_row:
             row_id = str(str(data['sku'])+'|'+str(data['size'])+'|'+str(data['price']))

@@ -1,7 +1,7 @@
 import scrapy
 from google.cloud import pubsub_v1
 from google.cloud import datastore
-
+import requests
 
 class BlogSpider(scrapy.Spider):
     name = 'blogspider'
@@ -44,6 +44,7 @@ class BlogSpider(scrapy.Spider):
         # self.count(len(temp))
         for n in temp:
             data = n
+
             # Data must be a bytestring
             data = data.encode('utf-8')
             # Add two attributes, origin and username, to the message
@@ -54,5 +55,6 @@ class BlogSpider(scrapy.Spider):
         published = future.result()
         print(published, "Messages !!!")
         dup_len = [self.urlss[i] for i in range(len(self.urlss)) if i == self.urlss.index(self.urlss[i])]
-        self.count(len(dup_len))
+        # self.count(len(dup_len))
+        r = requests.get('https://us-central1-linux-249818.cloudfunctions.net/function-1?val=crawl&num='+str(len(dup_len)))
         print("Duplicates urls", len(dup_len))

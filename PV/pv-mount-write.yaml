@@ -15,7 +15,7 @@ spec:
           claimName: my-vol
       containers:
       - name: crawl
-        image: hemanthk0208/crawl:v9
+        image: hemanthk0208/crawl:v11
         imagePullPolicy: Always
         volumeMounts:
         - name: google-cloud-key
